@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>mygit — content-addressable storage demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>mygit</h1>
+        <p class="subtitle">A live demo of content-addressable storage</p>
+        <p class="repo-path" id="repo-path">Repo: loading...</p>
+    </header>
+
+    <main>
+        <section class="panel">
+            <h2>1. Store an object</h2>
+            <p class="hint">
+                Type some content and store it.
+            </p>
+            <textarea id="content-input" rows="4" placeholder="Type file content here..."></textarea>
+            <div class="controls">
+                <button id="hash-only-btn">Hash only (preview, don't store)</button>
+                <button id="hash-store-btn" class="primary">Hash &amp; Store</button>
+            </div>
+            <div id="hash-result" class="result"></div>
+        </section>
+
+        <section class="panel">
+            <h2>2. Retrieve an object by hash</h2>
+            <p class="hint">Paste any hash from the store below (or one you just created) to fetch it back.</p>
+            <div class="controls">
+                <input type="text" id="retrieve-input" placeholder="Paste a 40-character SHA-1 hash...">
+                <button id="retrieve-btn" class="primary">Cat-File</button>
+            </div>
+            <div id="retrieve-result" class="result"></div>
+        </section>
+
+        <section class="panel">
+            <h2>3. Everything currently stored</h2>
+            <p class="hint">Every object in <code>.mygit/objects/</code> right now, sharded by the first 2 hash characters.</p>
+            <button id="refresh-btn">Refresh list</button>
+            <table id="objects-table">
+                <thead>
+                    <tr><th>Hash</th><th>Type</th><th>Size</th><th>Content preview</th></tr>
+                </thead>
+                <tbody id="objects-body"></tbody>
+            </table>
+            <p id="empty-state" class="hint" style="display:none;">No objects stored yet — add one above.</p>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

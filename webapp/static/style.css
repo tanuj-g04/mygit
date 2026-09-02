@@ -1,0 +1,156 @@
+* { box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+    background: #0f1115;
+    color: #e6e6e6;
+}
+
+header h1 {
+    font-family: "Consolas", "Menlo", monospace;
+    margin-bottom: 4px;
+}
+
+.subtitle {
+    color: #9aa0a6;
+    margin: 0 0 4px;
+}
+
+.repo-path {
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 24px;
+}
+
+.panel {
+    background: #171a21;
+    border: 1px solid #2a2f3a;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.panel h2 {
+    margin-top: 0;
+    font-size: 16px;
+}
+
+.hint {
+    color: #9aa0a6;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+textarea, input[type="text"] {
+    width: 100%;
+    background: #0f1115;
+    border: 1px solid #2a2f3a;
+    border-radius: 6px;
+    color: #e6e6e6;
+    padding: 10px;
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 13px;
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.controls input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+}
+
+button {
+    background: #262b36;
+    color: #e6e6e6;
+    border: 1px solid #3a4150;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #313846;
+}
+
+button.primary {
+    background: #3b6fe0;
+    border-color: #3b6fe0;
+    color: white;
+}
+
+button.primary:hover {
+    background: #4a7cf0;
+}
+
+.result {
+    margin-top: 14px;
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.result .hash {
+    color: #7ee787;
+}
+
+.result .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-left: 8px;
+}
+
+.badge.new {
+    background: #1f3d2a;
+    color: #7ee787;
+}
+
+.badge.existing {
+    background: #3d2f1f;
+    color: #f0b96b;
+}
+
+.badge.error {
+    background: #3d1f1f;
+    color: #f08b8b;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+    font-size: 13px;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 1px solid #2a2f3a;
+}
+
+th {
+    color: #9aa0a6;
+    font-weight: 500;
+}
+
+td.hash-cell {
+    font-family: "Consolas", "Menlo", monospace;
+    cursor: pointer;
+    color: #6ea8fe;
+}
+
+td.hash-cell:hover {
+    text-decoration: underline;
+}
