@@ -8,7 +8,7 @@
 <body>
     <header>
         <h1>mygit</h1>
-        <p class="subtitle">A live demo of content-addressable storage</p>
+        <p class="subtitle">A live demo of content-addressable storage — the same store your CLI uses.</p>
         <p class="repo-path" id="repo-path">Repo: loading...</p>
     </header>
 
@@ -16,7 +16,9 @@
         <section class="panel">
             <h2>1. Store an object</h2>
             <p class="hint">
-                Type some content and store it.
+                Type some content and store it. Try typing the exact same content twice —
+                you'll get the exact same hash back, and no new object gets written.
+                That's the dedup property in action.
             </p>
             <textarea id="content-input" rows="4" placeholder="Type file content here..."></textarea>
             <div class="controls">
@@ -47,6 +49,44 @@
                 <tbody id="objects-body"></tbody>
             </table>
             <p id="empty-state" class="hint" style="display:none;">No objects stored yet — add one above.</p>
+        </section>
+
+        <section class="panel">
+            <h2>4. Working directory files</h2>
+            <p class="hint">
+                These are real files sitting in the demo repo's folder — exactly what
+                <code>mygit commit</code> snapshots. Add a couple, then commit them below.
+            </p>
+            <div class="file-form">
+                <input type="text" id="file-name-input" placeholder="filename.txt">
+                <textarea id="file-content-input" rows="3" placeholder="file content..."></textarea>
+                <button id="save-file-btn" class="primary">Save file</button>
+            </div>
+            <ul id="files-list" class="files-list"></ul>
+            <p id="files-empty-state" class="hint" style="display:none;">No working files yet.</p>
+        </section>
+
+        <section class="panel">
+            <h2>5. Commit the working directory</h2>
+            <p class="hint">
+                Snapshots ALL current working files into a tree, wraps it in a commit
+                pointing at the previous commit as parent, and moves the branch forward.
+                There's no staging area — every commit captures everything currently
+                sitting in the working directory.
+            </p>
+            <div class="controls">
+                <input type="text" id="commit-message-input" placeholder="Commit message...">
+                <button id="commit-btn" class="primary">Commit</button>
+            </div>
+            <div id="commit-result" class="result"></div>
+        </section>
+
+        <section class="panel">
+            <h2>6. Commit history</h2>
+            <p class="hint">Walks the parent chain from the current commit backward — click a commit to see the files it snapshotted.</p>
+            <button id="refresh-log-btn">Refresh history</button>
+            <div id="log-list"></div>
+            <p id="log-empty-state" class="hint" style="display:none;">No commits yet.</p>
         </section>
     </main>
 

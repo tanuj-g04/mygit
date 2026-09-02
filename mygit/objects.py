@@ -24,9 +24,10 @@ correctness one).
 
 import hashlib
 import os
+import time
 import zlib
 
-from .repository import get_mygit_dir
+from .repository import MYGIT_DIR, get_mygit_dir
 
 
 def hash_object(data, obj_type="blob", write=True):
@@ -110,3 +111,134 @@ def read_object(sha1):
         )
 
     return obj_type, data
+
+
+# ---------------------------------------------------------------------------
+# Tree objects: a snapshot of a directory's structure.
+#
+# A tree is a sorted list of entries, one per file or subdirectory it
+# contains. Each entry is: "{mode} {type} {sha1}\t{name}\n"
+#   - mode: "100644" for a regular file, "40000" for a subdirectory
+#     (we don't track executable/symlink bits -- a known simplification)
+#   - type: "blob" (file) or "tree" (subdirectory)
+#   - sha1: the hash of that file's blob, or that subdirectory's own tree
+#   - name: the file/directory's name (NOT its full path -- trees nest,
+#     so a subdirectory's contents live in ITS tree object, not this one)
+#
+# NOTE on format: real git stores tree entries in a binary format (raw
+# 20-byte SHA digests, not hex text), so our tree hashes will NOT match
+# real git's hashes for the same directory the way our blob hashes did.
+# We use a plain-text format here for readability and simplicity; the
+# underlying concept (sorted list of name -> hash pointers) is identical.
+# ---------------------------------------------------------------------------
+
+def write_tree(dir_path):
+    """
+    Recursively snapshot `dir_path`: write a blob for every file and a
+    tree object (recursively) for every subdirectory, then write and
+    return the hash of the tree object describing dir_path itself.
+
+    This always excludes the .mygit directory -- we're snapshotting the
+    working files, never our own metadata.
+
+    Because entries are sorted by name and hashed deterministically, an
+    unchanged directory always produces the exact same tree hash -- so a
+    commit whose working tree didn't change reuses the existing tree
+    object instead of creating a new one (the same dedup property blobs
+    get, one level up).
+    """
+    entries = []
+
+    for name in sorted(os.listdir(dir_path)):
+        if name == MYGIT_DIR:
+            continue
+
+        full_path = os.path.join(dir_path, name)
+
+        if os.path.isdir(full_path):
+            sha1 = write_tree(full_path)
+            mode, obj_type = "40000", "tree"
+        else:
+            with open(full_path, "rb") as f:
+                data = f.read()
+            sha1 = hash_object(data, obj_type="blob", write=True)
+            mode, obj_type = "100644", "blob"
+
+        entries.append(f"{mode} {obj_type} {sha1}\t{name}\n")
+
+    tree_data = "".join(entries).encode()
+    return hash_object(tree_data, obj_type="tree", write=True)
+
+
+def read_tree(sha1):
+    """
+    Parse a tree object back into a list of entry dicts:
+    [{"mode": ..., "type": ..., "sha1": ..., "name": ...}, ...]
+    """
+    obj_type, data = read_object(sha1)
+    if obj_type != "tree":
+        raise ValueError(f"object {sha1} is a {obj_type}, not a tree")
+
+    entries = []
+    for line in data.decode().splitlines():
+        meta, name = line.split("\t", maxsplit=1)
+        mode, entry_type, entry_sha1 = meta.split(" ")
+        entries.append({"mode": mode, "type": entry_type, "sha1": entry_sha1, "name": name})
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# Commit objects: a tree snapshot + a pointer to the previous commit + a
+# message. The parent pointer is what turns a pile of snapshots into
+# actual HISTORY -- `log` just walks this chain backward.
+# ---------------------------------------------------------------------------
+
+def commit_tree(tree_sha1, parent_sha1, message, author="mygit user <user@example.com>"):
+    """
+    Create and store a commit object.
+
+    Args:
+        tree_sha1: hash of the tree this commit snapshots.
+        parent_sha1: hash of the previous commit, or None for the very
+            first commit in the repo's history (no parent).
+        message: commit message.
+        author: placeholder identity string (real git reads this from
+            git config; we don't implement config, so it's fixed for now).
+
+    Returns:
+        The new commit object's hash.
+    """
+    timestamp = int(time.time())
+
+    lines = [f"tree {tree_sha1}"]
+    if parent_sha1:
+        lines.append(f"parent {parent_sha1}")
+    lines.append(f"author {author} {timestamp}")
+    lines.append(f"committer {author} {timestamp}")
+    lines.append("")
+    lines.append(message)
+    lines.append("")
+
+    commit_data = "\n".join(lines).encode()
+    return hash_object(commit_data, obj_type="commit", write=True)
+
+
+def read_commit(sha1):
+    """
+    Parse a commit object into a dict:
+    {"tree": ..., "parent": ... or None, "author": ..., "committer": ..., "message": ...}
+    """
+    obj_type, data = read_object(sha1)
+    if obj_type != "commit":
+        raise ValueError(f"object {sha1} is a {obj_type}, not a commit")
+
+    header, message = data.decode().split("\n\n", maxsplit=1)
+
+    result = {"tree": None, "parent": None, "author": None, "committer": None}
+    for line in header.splitlines():
+        key, _, value = line.partition(" ")
+        if key in result:
+            result[key] = value
+
+    result["message"] = message.rstrip("\n")
+    return result

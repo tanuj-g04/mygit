@@ -154,3 +154,89 @@ td.hash-cell {
 td.hash-cell:hover {
     text-decoration: underline;
 }
+
+.file-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.files-list {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0 0;
+}
+
+.files-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: #0f1115;
+    border: 1px solid #2a2f3a;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 13px;
+}
+
+.files-list .file-preview {
+    color: #9aa0a6;
+    margin-left: 12px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.files-list button {
+    padding: 3px 10px;
+    font-size: 12px;
+}
+
+.commit-card {
+    background: #0f1115;
+    border: 1px solid #2a2f3a;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 10px;
+}
+
+.commit-card .commit-hash {
+    font-family: "Consolas", "Menlo", monospace;
+    color: #f0b96b;
+    font-size: 12px;
+}
+
+.commit-card .commit-message {
+    margin: 6px 0;
+    font-size: 14px;
+}
+
+.commit-card .commit-tree-toggle {
+    font-size: 12px;
+    padding: 3px 10px;
+}
+
+.commit-card .tree-entries {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #2a2f3a;
+    font-family: "Consolas", "Menlo", monospace;
+    font-size: 12px;
+    display: none;
+}
+
+.commit-card .tree-entries.visible {
+    display: block;
+}
+
+.commit-card .tree-entries div {
+    padding: 2px 0;
+    color: #9aa0a6;
+}
+
+.commit-card .tree-entries .entry-type-tree {
+    color: #6ea8fe;
+}

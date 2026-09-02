@@ -121,6 +121,118 @@ def api_list_objects():
     return jsonify(result)
 
 
+# ---------------------------------------------------------------------------
+# Day 2 additions: managing real working-directory files, committing them,
+# and viewing history -- this exercises write_tree/commit_tree/read_commit,
+# the same functions the `mygit commit` / `mygit log` CLI commands use.
+# ---------------------------------------------------------------------------
+
+def _working_files():
+    """List real files sitting in the demo repo's working directory (not .mygit)."""
+    names = []
+    for name in sorted(os.listdir(DEMO_REPO_DIR)):
+        if name == repository.MYGIT_DIR:
+            continue
+        full_path = os.path.join(DEMO_REPO_DIR, name)
+        if os.path.isfile(full_path):
+            names.append(name)
+    return names
+
+
+@app.route("/api/files", methods=["GET"])
+def api_list_files():
+    files = []
+    for name in _working_files():
+        with open(os.path.join(DEMO_REPO_DIR, name), "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        files.append({"name": name, "content": content})
+    return jsonify(files)
+
+
+@app.route("/api/files", methods=["POST"])
+def api_write_file():
+    """
+    Body: {"name": "<filename>", "content": "<text>"}
+    Writes (or overwrites) an actual file in the demo repo's working
+    directory -- this is what `commit` will snapshot, mirroring how you'd
+    normally edit files on disk before running `mygit commit`.
+    """
+    payload = request.get_json(force=True) or {}
+    # os.path.basename strips any directory components, preventing a
+    # filename like "../../etc/passwd" from writing outside the demo repo.
+    name = os.path.basename(payload.get("name", "").strip())
+    content = payload.get("content", "")
+
+    if not name:
+        return jsonify({"error": "filename is required"}), 400
+
+    with open(os.path.join(DEMO_REPO_DIR, name), "w", encoding="utf-8") as f:
+        f.write(content)
+
+    return jsonify({"name": name, "content": content})
+
+
+@app.route("/api/files/<name>", methods=["DELETE"])
+def api_delete_file(name):
+    name = os.path.basename(name)
+    path = os.path.join(DEMO_REPO_DIR, name)
+    if os.path.exists(path):
+        os.remove(path)
+    return jsonify({"deleted": name})
+
+
+@app.route("/api/commit", methods=["POST"])
+def api_commit():
+    """
+    Body: {"message": "<commit message>"}
+    Mirrors: mygit commit -m "<message>"
+    Snapshots the CURRENT working files (whatever /api/files shows right
+    now) as a tree, wraps it in a commit pointing at the previous commit
+    as parent, and advances the branch ref.
+    """
+    payload = request.get_json(force=True) or {}
+    message = payload.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "commit message is required"}), 400
+
+    tree_sha1 = objects.write_tree(DEMO_REPO_DIR)
+    parent_sha1 = repository.get_current_commit()
+    commit_sha1 = objects.commit_tree(tree_sha1, parent_sha1, message)
+    repository.update_ref(repository.get_head_ref(), commit_sha1)
+
+    return jsonify({"hash": commit_sha1, "tree": tree_sha1, "parent": parent_sha1})
+
+
+@app.route("/api/log")
+def api_log():
+    """Mirrors: mygit log -- walks the parent chain from the current commit."""
+    commit_sha1 = repository.get_current_commit()
+    history = []
+
+    while commit_sha1:
+        commit = objects.read_commit(commit_sha1)
+        history.append({
+            "hash": commit_sha1,
+            "tree": commit["tree"],
+            "parent": commit["parent"],
+            "author": commit["author"],
+            "message": commit["message"],
+        })
+        commit_sha1 = commit["parent"]
+
+    return jsonify(history)
+
+
+@app.route("/api/tree/<sha1>")
+def api_tree(sha1):
+    """List a tree object's entries -- what a given commit's snapshot contains."""
+    try:
+        entries = objects.read_tree(sha1)
+    except (FileNotFoundError, ValueError) as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify(entries)
+
+
 def _object_exists(sha1):
     obj_path = os.path.join(repository.get_mygit_dir(), "objects", sha1[:2], sha1[2:])
     return os.path.exists(obj_path)

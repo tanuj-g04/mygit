@@ -78,3 +78,61 @@ def init(path="."):
 
     print(f"Initialized empty mygit repository in {mygit_dir}")
     return mygit_dir
+
+
+# ---------------------------------------------------------------------------
+# Refs: named pointers to commits. HEAD is a symbolic ref that points at
+# a branch (e.g. "refs/heads/master"); the branch file itself holds the
+# actual commit hash. This indirection is what makes `git checkout
+# <branch>` work in real git -- it just repoints HEAD. We only support
+# a single branch (master) for now; branch creation/switching is a
+# Day 3 item, not implemented yet.
+# ---------------------------------------------------------------------------
+
+def get_head_ref():
+    """
+    Return the ref path HEAD currently points at, e.g. "refs/heads/master".
+
+    Raises ValueError if HEAD is "detached" (pointing directly at a
+    commit hash rather than a branch) -- we don't support detached HEAD
+    yet, so this should never happen through normal mygit commands.
+    """
+    mygit_dir = get_mygit_dir()
+    with open(os.path.join(mygit_dir, "HEAD")) as f:
+        content = f.read().strip()
+
+    if not content.startswith("ref: "):
+        raise ValueError("detached HEAD is not supported yet")
+
+    return content[len("ref: "):]
+
+
+def read_ref(ref_path):
+    """
+    Return the commit hash stored at `ref_path` (e.g. "refs/heads/master"),
+    or None if that ref doesn't exist yet -- which is the normal state
+    for a brand new repo before its first commit.
+    """
+    mygit_dir = get_mygit_dir()
+    full_path = os.path.join(mygit_dir, ref_path)
+    if not os.path.exists(full_path):
+        return None
+    with open(full_path) as f:
+        return f.read().strip()
+
+
+def update_ref(ref_path, sha1):
+    """Point `ref_path` (e.g. "refs/heads/master") at commit `sha1`."""
+    mygit_dir = get_mygit_dir()
+    full_path = os.path.join(mygit_dir, ref_path)
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    with open(full_path, "w") as f:
+        f.write(sha1 + "\n")
+
+
+def get_current_commit():
+    """
+    Return the commit hash the current branch points at, or None if the
+    branch has no commits yet (a fresh repo, or one where init just ran).
+    """
+    return read_ref(get_head_ref())

@@ -32,6 +32,46 @@ def cmd_cat_file(args):
         sys.stdout.buffer.write(data)
 
 
+def cmd_commit(args):
+    """
+    Snapshot the entire working directory as a tree, wrap it in a commit
+    pointing at the current HEAD commit (if any) as its parent, then
+    advance the current branch to the new commit.
+
+    Note: there's no staging area yet, so this always commits the FULL
+    current state of the working directory -- there's no equivalent of
+    `git add` to select a subset of changes.
+    """
+    repo_root = repository.find_repo_root()
+    if repo_root is None:
+        raise FileNotFoundError("not a mygit repository")
+
+    tree_sha1 = objects.write_tree(repo_root)
+    parent_sha1 = repository.get_current_commit()
+    commit_sha1 = objects.commit_tree(tree_sha1, parent_sha1, args.message)
+
+    repository.update_ref(repository.get_head_ref(), commit_sha1)
+    print(commit_sha1)
+
+
+def cmd_log(args):
+    """Walk the parent chain from the current commit backward, printing each."""
+    commit_sha1 = repository.get_current_commit()
+    if commit_sha1 is None:
+        print("no commits yet")
+        return
+
+    while commit_sha1:
+        commit = objects.read_commit(commit_sha1)
+        print(f"commit {commit_sha1}")
+        print(f"Author: {commit['author']}")
+        print()
+        for line in commit["message"].splitlines():
+            print(f"    {line}")
+        print()
+        commit_sha1 = commit["parent"]
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="mygit", description="A minimal git internals clone.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -52,6 +92,13 @@ def build_parser():
     group.add_argument("-t", dest="type_only", action="store_true", help="show object type only")
     group.add_argument("-s", dest="size_only", action="store_true", help="show object size only")
     p_cat.set_defaults(func=cmd_cat_file, type_only=False, size_only=False)
+
+    p_commit = subparsers.add_parser("commit", help="Snapshot the working directory as a new commit")
+    p_commit.add_argument("-m", "--message", required=True, help="Commit message")
+    p_commit.set_defaults(func=cmd_commit)
+
+    p_log = subparsers.add_parser("log", help="Show commit history")
+    p_log.set_defaults(func=cmd_log)
 
     return parser
 
