@@ -22,8 +22,10 @@ files as the repo grows (a filesystem performance concern, not a
 correctness one).
 """
 
+import difflib
 import hashlib
 import os
+import shutil
 import time
 import zlib
 
@@ -242,3 +244,109 @@ def read_commit(sha1):
 
     result["message"] = message.rstrip("\n")
     return result
+
+
+# ---------------------------------------------------------------------------
+# Day 3: checkout (restore a tree onto disk) and diff (compare the working
+# directory against a commit's tree).
+# ---------------------------------------------------------------------------
+
+def checkout_tree(tree_sha1, dir_path):
+    """
+    Restore dir_path's contents to exactly match `tree_sha1`: write every
+    blob out as a real file, recreate subdirectories, and remove any
+    file/directory in dir_path that the tree doesn't have -- so the
+    result is an exact match, not a superset.
+
+    Known simplification: this is a "hard" checkout. Real git checks for
+    uncommitted changes first and refuses (or warns) if switching
+    branches would overwrite them; this implementation has no such
+    check and will silently overwrite/delete working files that aren't
+    part of the target tree.
+    """
+    entries = read_tree(tree_sha1)
+    entry_names = {e["name"] for e in entries}
+
+    for name in os.listdir(dir_path):
+        if name == MYGIT_DIR:
+            continue
+        if name not in entry_names:
+            full_path = os.path.join(dir_path, name)
+            if os.path.isdir(full_path):
+                shutil.rmtree(full_path)
+            else:
+                os.remove(full_path)
+
+    for entry in entries:
+        full_path = os.path.join(dir_path, entry["name"])
+        if entry["type"] == "tree":
+            os.makedirs(full_path, exist_ok=True)
+            checkout_tree(entry["sha1"], full_path)
+        else:
+            _, content = read_object(entry["sha1"])
+            with open(full_path, "wb") as f:
+                f.write(content)
+
+
+def _flatten_tree(tree_sha1, prefix=""):
+    """Return {relative_path: blob_sha1} for every FILE in a tree, recursively."""
+    result = {}
+    for entry in read_tree(tree_sha1):
+        rel_path = f"{prefix}{entry['name']}"
+        if entry["type"] == "tree":
+            result.update(_flatten_tree(entry["sha1"], prefix=rel_path + "/"))
+        else:
+            result[rel_path] = entry["sha1"]
+    return result
+
+
+def _flatten_working_dir(dir_path, prefix=""):
+    """Return {relative_path: raw_bytes} for every FILE under dir_path, recursively."""
+    result = {}
+    for name in sorted(os.listdir(dir_path)):
+        if name == MYGIT_DIR:
+            continue
+        full_path = os.path.join(dir_path, name)
+        rel_path = f"{prefix}{name}"
+        if os.path.isdir(full_path):
+            result.update(_flatten_working_dir(full_path, prefix=rel_path + "/"))
+        else:
+            with open(full_path, "rb") as f:
+                result[rel_path] = f.read()
+    return result
+
+
+def diff_working_directory(dir_path, tree_sha1):
+    """
+    Compare the working directory against a tree (normally HEAD's tree)
+    and return a list of per-file changes:
+        {"path": ..., "status": "added" | "removed" | "modified", "diff": [...]}
+    "diff" (a unified diff, line by line) is only present for "modified".
+
+    Known simplification: since there's no staging area, this always
+    compares the FULL working directory against the last commit -- there
+    is no separate "staged vs unstaged" distinction the way real
+    `git diff` / `git diff --staged` provide.
+    """
+    committed = _flatten_tree(tree_sha1) if tree_sha1 else {}
+    working = _flatten_working_dir(dir_path)
+
+    changes = []
+    for path in sorted(set(committed) | set(working)):
+        if path in working and path not in committed:
+            changes.append({"path": path, "status": "added"})
+        elif path in committed and path not in working:
+            changes.append({"path": path, "status": "removed"})
+        else:
+            _, committed_content = read_object(committed[path])
+            working_content = working[path]
+            if committed_content != working_content:
+                diff_lines = list(difflib.unified_diff(
+                    committed_content.decode(errors="replace").splitlines(keepends=True),
+                    working_content.decode(errors="replace").splitlines(keepends=True),
+                    fromfile=f"a/{path}",
+                    tofile=f"b/{path}",
+                ))
+                changes.append({"path": path, "status": "modified", "diff": diff_lines})
+
+    return changes

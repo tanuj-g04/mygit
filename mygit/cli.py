@@ -72,6 +72,62 @@ def cmd_log(args):
         commit_sha1 = commit["parent"]
 
 
+def cmd_branch(args):
+    """
+    No name given: list all branches, marking the current one with '*'.
+    Name given: create a new branch pointing at the current commit.
+    """
+    if args.name:
+        commit_sha1 = repository.get_current_commit()
+        if commit_sha1 is None:
+            raise ValueError("cannot create a branch: no commits yet")
+        repository.update_ref(f"refs/heads/{args.name}", commit_sha1)
+        print(f"Created branch '{args.name}'")
+    else:
+        current_ref = repository.get_head_ref()
+        for name in repository.list_branches():
+            marker = "*" if f"refs/heads/{name}" == current_ref else " "
+            print(f"{marker} {name}")
+
+
+def cmd_checkout(args):
+    """
+    Switch to another branch: point HEAD at it, then restore the working
+    directory to exactly match that branch's latest commit.
+    """
+    target_ref = f"refs/heads/{args.branch}"
+    commit_sha1 = repository.read_ref(target_ref)
+    if commit_sha1 is None:
+        raise FileNotFoundError(f"branch '{args.branch}' does not exist")
+
+    repo_root = repository.find_repo_root()
+    commit = objects.read_commit(commit_sha1)
+    objects.checkout_tree(commit["tree"], repo_root)
+    repository.set_head_ref(target_ref)
+    print(f"Switched to branch '{args.branch}'")
+
+
+def cmd_diff(args):
+    """Show the difference between the working directory and the current HEAD commit."""
+    repo_root = repository.find_repo_root()
+    commit_sha1 = repository.get_current_commit()
+    tree_sha1 = objects.read_commit(commit_sha1)["tree"] if commit_sha1 else None
+
+    changes = objects.diff_working_directory(repo_root, tree_sha1)
+    if not changes:
+        print("no changes")
+        return
+
+    for change in changes:
+        if change["status"] == "added":
+            print(f"added: {change['path']}")
+        elif change["status"] == "removed":
+            print(f"removed: {change['path']}")
+        else:
+            print(f"modified: {change['path']}")
+            sys.stdout.writelines(change["diff"])
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="mygit", description="A minimal git internals clone.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -99,6 +155,17 @@ def build_parser():
 
     p_log = subparsers.add_parser("log", help="Show commit history")
     p_log.set_defaults(func=cmd_log)
+
+    p_branch = subparsers.add_parser("branch", help="List branches, or create a new one")
+    p_branch.add_argument("name", nargs="?", default=None, help="Name of branch to create (omit to list)")
+    p_branch.set_defaults(func=cmd_branch)
+
+    p_checkout = subparsers.add_parser("checkout", help="Switch to another branch")
+    p_checkout.add_argument("branch", help="Branch name to switch to")
+    p_checkout.set_defaults(func=cmd_checkout)
+
+    p_diff = subparsers.add_parser("diff", help="Show changes between the working directory and HEAD")
+    p_diff.set_defaults(func=cmd_diff)
 
     return parser
 

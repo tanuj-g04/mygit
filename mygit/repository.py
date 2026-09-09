@@ -136,3 +136,22 @@ def get_current_commit():
     branch has no commits yet (a fresh repo, or one where init just ran).
     """
     return read_ref(get_head_ref())
+
+
+def list_branches():
+    """Return the names of all branches (files under refs/heads/), sorted."""
+    heads_dir = os.path.join(get_mygit_dir(), "refs", "heads")
+    if not os.path.isdir(heads_dir):
+        return []
+    return sorted(os.listdir(heads_dir))
+
+
+def set_head_ref(ref_path):
+    """
+    Point HEAD at a different branch (e.g. "refs/heads/feature"), used by
+    checkout. Unlike update_ref (which writes a commit hash into a branch
+    file), this rewrites HEAD's symbolic pointer itself.
+    """
+    mygit_dir = get_mygit_dir()
+    with open(os.path.join(mygit_dir, "HEAD"), "w") as f:
+        f.write(f"ref: {ref_path}\n")
